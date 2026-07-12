@@ -106,6 +106,7 @@ export async function createSession(
     avgLiveWeight: input.avgLiveWeight ?? null,
     notes: input.notes ?? null,
     status: "capturing",
+    currentCaptureIndex: 1,
     createdAt: now,
     updatedAt: now,
     clientId: uuidv7(),
@@ -231,12 +232,22 @@ export async function updateSession(
   return next;
 }
 
+/**
+ * Reopen a finished session for another harvest day.
+ * Increments currentCaptureIndex only when status was complete (Finish → Reopen).
+ * Mid-session navigate-away without Finish does not call this — no bump.
+ */
 export async function reopenSession(sessionId: string): Promise<void> {
   const db = getDb();
   const existing = await db.sessions.get(sessionId);
   if (!existing) throw new Error("Session not found");
+  const nextIndex =
+    existing.status === "complete"
+      ? (existing.currentCaptureIndex ?? 1) + 1
+      : (existing.currentCaptureIndex ?? 1);
   await db.sessions.update(sessionId, {
     status: "capturing",
+    currentCaptureIndex: nextIndex,
     updatedAt: nowIso(),
     syncStatus: "pending",
   });
@@ -253,16 +264,21 @@ export async function addBird(params: {
 }): Promise<BirdRecord> {
   const db = getDb();
   const now = nowIso();
+  const session = await db.sessions.get(params.sessionId);
+  if (!session) throw new Error("Session not found");
+
   const birds = await db.birds
     .where("sessionId")
     .equals(params.sessionId)
     .sortBy("sequence");
   const maxSeq = birds.at(-1)?.sequence ?? 0;
+  const captureIndex = session.currentCaptureIndex ?? 1;
 
   const bird: BirdRecord = {
     id: uuidv7(),
     sessionId: params.sessionId,
     sequence: maxSeq + 1,
+    captureIndex,
     dressedWeightLb: params.dressedWeightLb,
     liveWeightLb: params.liveWeightLb ?? null,
     condemned: params.condemned ?? false,
@@ -357,13 +373,28 @@ export async function getRunningTally(sessionId: string): Promise<{
   count: number;
   saleable: number;
   totalDressedLb: number;
+  captureCount: number;
+  captureSaleable: number;
+  captureDressedLb: number;
 }> {
   const db = getDb();
+  const session = await db.sessions.get(sessionId);
+  const captureIndex = session?.currentCaptureIndex ?? 1;
   const birds = await db.birds.where("sessionId").equals(sessionId).toArray();
   const saleable = birds.filter((b) => !b.condemned);
+  const inCapture = birds.filter(
+    (b) => (b.captureIndex ?? 1) === captureIndex
+  );
+  const captureSaleable = inCapture.filter((b) => !b.condemned);
   return {
     count: birds.length,
     saleable: saleable.length,
     totalDressedLb: saleable.reduce((s, b) => s + b.dressedWeightLb, 0),
+    captureCount: inCapture.length,
+    captureSaleable: captureSaleable.length,
+    captureDressedLb: captureSaleable.reduce(
+      (s, b) => s + b.dressedWeightLb,
+      0
+    ),
   };
 }

@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import type { MetricsResult, ProcessingSession } from "./types";
+import type { CaptureBreakdown, MetricsResult, ProcessingSession } from "./types";
 import {
   formatLb,
   formatMoney,
@@ -9,7 +9,8 @@ import {
 
 export function buildSessionSummaryText(
   session: ProcessingSession,
-  metrics: MetricsResult
+  metrics: MetricsResult,
+  harvests?: CaptureBreakdown[]
 ): string {
   const lines = [
     `Flock processing summary — ${session.flockName}`,
@@ -39,6 +40,16 @@ export function buildSessionSummaryText(
     `Margin: ${formatPct(metrics.marginPct)}`,
     `Profit / bird: ${formatMoney(metrics.profitPerBird)}`,
   ];
+
+  if (harvests && harvests.length > 1) {
+    lines.push("", "By harvest:");
+    for (const h of harvests) {
+      lines.push(
+        `  Harvest ${h.captureIndex}: ${h.birdsSaleable} saleable, ${formatLb(h.totalDressedLb)}`
+      );
+    }
+  }
+
   return lines.join("\n");
 }
 

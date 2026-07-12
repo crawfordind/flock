@@ -1,8 +1,51 @@
-import type { BirdRecord, MetricsResult, ProcessingSession } from "../types";
+import type {
+  BirdRecord,
+  CaptureBreakdown,
+  MetricsResult,
+  ProcessingSession,
+} from "../types";
 
 function safeDiv(n: number, d: number): number | null {
   if (!Number.isFinite(n) || !Number.isFinite(d) || d === 0) return null;
   return n / d;
+}
+
+/**
+ * Group birds into per-harvest yield rows.
+ * Additive breakdown only — session cost metrics stay on the whole session.
+ */
+export function groupBirdsByCapture(
+  birds: Pick<BirdRecord, "captureIndex" | "dressedWeightLb" | "condemned">[]
+): CaptureBreakdown[] {
+  const byIndex = new Map<
+    number,
+    { processed: number; saleable: number; dressed: number }
+  >();
+
+  for (const b of birds) {
+    const idx =
+      typeof b.captureIndex === "number" && b.captureIndex >= 1
+        ? b.captureIndex
+        : 1;
+    const row = byIndex.get(idx) ?? { processed: 0, saleable: 0, dressed: 0 };
+    row.processed += 1;
+    if (!b.condemned) {
+      row.saleable += 1;
+      row.dressed += b.dressedWeightLb || 0;
+    }
+    byIndex.set(idx, row);
+  }
+
+  return [...byIndex.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([captureIndex, row]) => ({
+      captureIndex,
+      birdsProcessed: row.processed,
+      birdsSaleable: row.saleable,
+      birdsCondemned: row.processed - row.saleable,
+      totalDressedLb: row.dressed,
+      avgDressedLb: safeDiv(row.dressed, row.saleable),
+    }));
 }
 
 /** Build weight distribution buckets for saleable dressed weights */

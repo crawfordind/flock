@@ -251,6 +251,9 @@ export default function HomePage() {
                           </div>
                           <div className="muted session-meta">
                             {formatSessionDate(s.processedAt)}
+                            {(s.currentCaptureIndex ?? 1) > 1
+                              ? ` · ${s.currentCaptureIndex} harvests`
+                              : ""}
                             {capturing
                               ? " · tap to resume capture"
                               : " · view results"}

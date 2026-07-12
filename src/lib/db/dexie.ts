@@ -31,6 +31,34 @@ export class FlockDB extends Dexie {
       media: "id, sessionId, birdId, clientId, updatedAt",
       meta: "key",
     });
+
+    // Multi-harvest: currentCaptureIndex on sessions, captureIndex on birds
+    this.version(2)
+      .stores({
+        users: "id, clientId, updatedAt",
+        flocks: "id, userId, clientId, updatedAt, name",
+        feedLogs: "id, flockId, clientId, updatedAt",
+        sessions:
+          "id, userId, flockId, clientId, updatedAt, processedAt, status, syncStatus",
+        birds:
+          "id, sessionId, clientId, updatedAt, sequence, captureIndex, [sessionId+sequence], syncStatus",
+        media: "id, sessionId, birdId, clientId, updatedAt",
+        meta: "key",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("sessions")
+          .toCollection()
+          .modify((s: { currentCaptureIndex?: number }) => {
+            if (s.currentCaptureIndex == null) s.currentCaptureIndex = 1;
+          });
+        await tx
+          .table("birds")
+          .toCollection()
+          .modify((b: { captureIndex?: number }) => {
+            if (b.captureIndex == null) b.captureIndex = 1;
+          });
+      });
   }
 }
 

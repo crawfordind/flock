@@ -434,6 +434,26 @@ textarea {
   border-bottom: 1px solid #222922;
 }
 
+.capture-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.harvest-badge {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cap-bg);
+  background: var(--cap-accent);
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
 .tally {
   font-family: var(--font-mono);
   font-size: 0.95rem;

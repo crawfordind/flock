@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateMetrics } from "./calculate";
+import { calculateMetrics, groupBirdsByCapture } from "./calculate";
 
 /** Worked Freedom Rangers sample from PRD */
 describe("calculateMetrics — Freedom Rangers worked example", () => {
@@ -70,6 +70,111 @@ describe("calculateMetrics — Freedom Rangers worked example", () => {
     expect(m.fcrVisible).toBe(true);
     expect(m.estTotalLiveLb!).toBeCloseTo(48 * 7.2, 5);
     expect(m.fcr!).toBeCloseTo(900 / (48 * 7.2), 5);
+  });
+});
+
+describe("groupBirdsByCapture — multi-harvest breakdown", () => {
+  it("groups additive yield by captureIndex", () => {
+    const birds = [
+      ...Array.from({ length: 50 }, () => ({
+        captureIndex: 1,
+        dressedWeightLb: 5,
+        condemned: false,
+      })),
+      ...Array.from({ length: 100 }, () => ({
+        captureIndex: 2,
+        dressedWeightLb: 5.2,
+        condemned: false,
+      })),
+      ...Array.from({ length: 48 }, () => ({
+        captureIndex: 3,
+        dressedWeightLb: 5.1,
+        condemned: false,
+      })),
+      { captureIndex: 3, dressedWeightLb: 4, condemned: true },
+      { captureIndex: 3, dressedWeightLb: 3.5, condemned: true },
+    ];
+
+    const groups = groupBirdsByCapture(birds);
+    expect(groups).toHaveLength(3);
+
+    expect(groups[0]).toMatchObject({
+      captureIndex: 1,
+      birdsProcessed: 50,
+      birdsSaleable: 50,
+      birdsCondemned: 0,
+      totalDressedLb: 250,
+    });
+    expect(groups[0].avgDressedLb).toBe(5);
+
+    expect(groups[1]).toMatchObject({
+      captureIndex: 2,
+      birdsProcessed: 100,
+      birdsSaleable: 100,
+    });
+    expect(groups[1].totalDressedLb).toBeCloseTo(520, 5);
+
+    expect(groups[2]).toMatchObject({
+      captureIndex: 3,
+      birdsProcessed: 50,
+      birdsSaleable: 48,
+      birdsCondemned: 2,
+    });
+    expect(groups[2].totalDressedLb).toBeCloseTo(48 * 5.1, 5);
+  });
+
+  it("defaults missing captureIndex to 1", () => {
+    const groups = groupBirdsByCapture([
+      {
+        captureIndex: undefined as unknown as number,
+        dressedWeightLb: 5,
+        condemned: false,
+      },
+      { captureIndex: 2, dressedWeightLb: 6, condemned: false },
+    ]);
+    expect(groups.map((g) => g.captureIndex)).toEqual([1, 2]);
+    expect(groups[0].birdsProcessed).toBe(1);
+    expect(groups[1].totalDressedLb).toBe(6);
+  });
+
+  it("session metrics still roll up all harvests", () => {
+    const session = {
+      birdsStarted: 250,
+      chickCost: 500,
+      feedLbs: 4000,
+      feedCost: 1200,
+      suppliesCost: 100,
+      targetPricePerLb: 6,
+      avgLiveWeight: null as number | null,
+    };
+    const birds = [
+      ...Array.from({ length: 50 }, () => ({
+        captureIndex: 1,
+        dressedWeightLb: 5,
+        liveWeightLb: null as number | null,
+        condemned: false,
+      })),
+      ...Array.from({ length: 100 }, () => ({
+        captureIndex: 2,
+        dressedWeightLb: 5,
+        liveWeightLb: null,
+        condemned: false,
+      })),
+      ...Array.from({ length: 50 }, () => ({
+        captureIndex: 3,
+        dressedWeightLb: 5,
+        liveWeightLb: null,
+        condemned: false,
+      })),
+    ];
+    const m = calculateMetrics(session, birds);
+    expect(m.birdsSaleable).toBe(200);
+    expect(m.totalDressedLb).toBe(1000);
+    expect(m.totalCost).toBe(1800);
+    expect(m.costPerLb!).toBeCloseTo(1.8, 5);
+    expect(
+      groupBirdsByCapture(birds).reduce((s, g) => s + g.totalDressedLb, 0)
+    ).toBe(m.totalDressedLb);
   });
 });
 

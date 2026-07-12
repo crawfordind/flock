@@ -35,7 +35,14 @@ export default function CapturePage() {
   const router = useRouter();
 
   const [session, setSession] = useState<ProcessingSession | null>(null);
-  const [tally, setTally] = useState({ count: 0, saleable: 0, totalDressedLb: 0 });
+  const [tally, setTally] = useState({
+    count: 0,
+    saleable: 0,
+    totalDressedLb: 0,
+    captureCount: 0,
+    captureSaleable: 0,
+    captureDressedLb: 0,
+  });
   const [input, setInput] = useState("");
   const [condemned, setCondemned] = useState(false);
   const [liveMode, setLiveMode] = useState(false);
@@ -199,11 +206,19 @@ export default function CapturePage() {
           ? "Condemned weight"
           : "Dressed weight";
 
+  const harvest = session?.currentCaptureIndex ?? 1;
+  const multiHarvest = harvest > 1 || tally.count > tally.captureCount;
+
   return (
     <div className={`capture-root${pulse ? " capture-pulse" : ""}`}>
       <div className="capture-top">
         <div>
-          <div style={{ fontWeight: 700 }}>{session?.flockName ?? "Capture"}</div>
+          <div className="capture-title-row">
+            <div style={{ fontWeight: 700 }}>{session?.flockName ?? "Capture"}</div>
+            <div className="harvest-badge" aria-label={`Harvest ${harvest}`}>
+              Harvest {harvest}
+            </div>
+          </div>
           <div className="tally">
             Bird{" "}
             <strong>
@@ -212,6 +227,13 @@ export default function CapturePage() {
             </strong>
             {" · "}
             {tally.saleable} saleable · {tally.totalDressedLb.toFixed(1)} lb
+            {multiHarvest && (
+              <>
+                <br />
+                This harvest: {tally.captureCount} · {tally.captureSaleable}{" "}
+                saleable · {tally.captureDressedLb.toFixed(1)} lb
+              </>
+            )}
           </div>
         </div>
         <div className="capture-top-links">
@@ -312,12 +334,16 @@ export default function CapturePage() {
       {confirmFinish ? (
         <div className="capture-confirm" role="alertdialog" aria-labelledby="finish-title">
           <div id="finish-title" className="capture-confirm-title">
-            Finish this session?
+            Finish this harvest?
           </div>
           <p className="capture-confirm-body">
             {tally.count} bird{tally.count === 1 ? "" : "s"} logged ·{" "}
-            {tally.saleable} saleable. You can still open results afterward, but
-            capture closes.
+            {tally.saleable} saleable
+            {multiHarvest
+              ? ` · harvest ${harvest}: ${tally.captureCount}`
+              : ""}
+            . Reopen later to start the next harvest — costs stay on this
+            session.
           </p>
           <div className="capture-confirm-actions">
             <button
@@ -334,7 +360,7 @@ export default function CapturePage() {
               disabled={busy}
               onClick={() => void onFinishConfirmed()}
             >
-              Finish session
+              Finish harvest
             </button>
           </div>
         </div>

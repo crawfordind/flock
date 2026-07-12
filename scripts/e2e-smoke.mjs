@@ -236,7 +236,7 @@ async function main() {
     await page.getByRole("button", { name: /Keep capturing/i }).waitFor({
       timeout: 5000,
     });
-    await page.getByRole("button", { name: /^Finish session$/i }).click();
+    await page.getByRole("button", { name: /^Finish harvest$/i }).click();
     await page.waitForURL(/\/results\//, { timeout: 15000 });
     await page.waitForSelector(".kpi", { timeout: 15000 });
     const finishBody = await page.locator("body").innerText();

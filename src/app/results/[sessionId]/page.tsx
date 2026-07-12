@@ -13,9 +13,14 @@ import {
   formatMoney,
   formatNum,
   formatPct,
+  groupBirdsByCapture,
 } from "@/lib/metrics/calculate";
 import { buildSessionSummaryText, downloadSessionPdf } from "@/lib/pdf";
-import type { MetricsResult, ProcessingSession } from "@/lib/types";
+import type {
+  CaptureBreakdown,
+  MetricsResult,
+  ProcessingSession,
+} from "@/lib/types";
 
 export default function ResultsPage() {
   const params = useParams<{ sessionId: string }>();
@@ -24,6 +29,7 @@ export default function ResultsPage() {
 
   const [session, setSession] = useState<ProcessingSession | null>(null);
   const [metrics, setMetrics] = useState<MetricsResult | null>(null);
+  const [harvests, setHarvests] = useState<CaptureBreakdown[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -41,6 +47,7 @@ export default function ResultsPage() {
       }
       setSession(data.session);
       setMetrics(data.metrics);
+      setHarvests(groupBirdsByCapture(data.birds));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     }
@@ -55,7 +62,7 @@ export default function ResultsPage() {
     setEmailBusy(true);
     setEmailMsg(null);
     try {
-      const text = buildSessionSummaryText(session, metrics);
+      const text = buildSessionSummaryText(session, metrics, harvests);
       const res = await fetch("/api/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -138,6 +145,9 @@ export default function ResultsPage() {
           <div className="muted" style={{ fontSize: "0.85rem" }}>
             {session.flockName} ·{" "}
             {new Date(session.processedAt).toLocaleDateString()}
+            {harvests.length > 1
+              ? ` · ${harvests.length} harvests`
+              : ""}
           </div>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -242,6 +252,65 @@ export default function ResultsPage() {
             </div>
           )}
         </section>
+
+        {harvests.length > 1 && (
+          <section className="panel animate-in delay-1">
+            <h2 style={{ margin: "0 0 0.75rem", fontSize: "1.1rem" }}>
+              By harvest
+            </h2>
+            <p
+              className="muted"
+              style={{ margin: "0 0 1rem", fontSize: "0.9rem" }}
+            >
+              Yield per harvest day. Session costs and overall totals still
+              roll up everything.
+            </p>
+            <div style={{ display: "grid", gap: "0.65rem" }}>
+              {harvests.map((h) => (
+                <div
+                  key={h.captureIndex}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(5.5rem, auto) 1fr auto",
+                    gap: "0.75rem",
+                    alignItems: "baseline",
+                    padding: "0.55rem 0",
+                    borderBottom: "1px solid var(--line)",
+                  }}
+                >
+                  <div style={{ fontWeight: 700 }}>
+                    Harvest {h.captureIndex}
+                  </div>
+                  <div className="muted" style={{ fontSize: "0.9rem" }}>
+                    {h.birdsSaleable} saleable
+                    {h.birdsCondemned > 0
+                      ? ` · ${h.birdsCondemned} condemned`
+                      : ""}
+                    {" · "}
+                    {h.birdsProcessed} logged
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontWeight: 600,
+                      textAlign: "right",
+                    }}
+                  >
+                    {formatNum(h.totalDressedLb, 1)} lb
+                    {h.avgDressedLb != null && (
+                      <div
+                        className="muted"
+                        style={{ fontSize: "0.8rem", fontWeight: 500 }}
+                      >
+                        avg {formatLb(h.avgDressedLb)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="panel animate-in delay-1">
           <h2 style={{ margin: "0 0 1rem", fontSize: "1.1rem" }}>

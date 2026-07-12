@@ -52,6 +52,11 @@ export interface ProcessingSession {
   avgLiveWeight: number | null;
   notes: string | null;
   status: "setup" | "capturing" | "complete";
+  /**
+   * 1-based harvest / capture wave currently open for logging.
+   * Starts at 1; increments only when reopening capture after Finish.
+   */
+  currentCaptureIndex: number;
   createdAt: string;
   updatedAt: string;
   clientId: string;
@@ -62,6 +67,8 @@ export interface BirdRecord {
   id: string;
   sessionId: string;
   sequence: number;
+  /** 1-based harvest / capture wave this bird was logged under */
+  captureIndex: number;
   dressedWeightLb: number;
   liveWeightLb: number | null;
   condemned: boolean;
@@ -71,6 +78,16 @@ export interface BirdRecord {
   updatedAt: string;
   clientId: string;
   syncStatus: SyncStatus;
+}
+
+/** Per-harvest yield breakdown (additive; costs stay session-level) */
+export interface CaptureBreakdown {
+  captureIndex: number;
+  birdsProcessed: number;
+  birdsSaleable: number;
+  birdsCondemned: number;
+  totalDressedLb: number;
+  avgDressedLb: number | null;
 }
 
 export interface Media {

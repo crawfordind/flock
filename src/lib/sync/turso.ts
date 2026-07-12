@@ -72,6 +72,7 @@ export async function ensureCloudSchema(db: Client): Promise<void> {
       avg_live_weight REAL,
       notes TEXT,
       status TEXT NOT NULL,
+      current_capture_index INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       client_id TEXT NOT NULL UNIQUE
@@ -83,6 +84,7 @@ export async function ensureCloudSchema(db: Client): Promise<void> {
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
       sequence INTEGER NOT NULL,
+      capture_index INTEGER NOT NULL DEFAULT 1,
       dressed_weight_lb REAL NOT NULL,
       live_weight_lb REAL,
       condemned INTEGER NOT NULL DEFAULT 0,
@@ -109,6 +111,18 @@ export async function ensureCloudSchema(db: Client): Promise<void> {
   for (const sql of statements) {
     await db.execute(sql);
   }
+
+  // Migrate existing cloud DBs that predate multi-harvest columns
+  for (const alter of [
+    `ALTER TABLE processing_sessions ADD COLUMN current_capture_index INTEGER NOT NULL DEFAULT 1`,
+    `ALTER TABLE bird_records ADD COLUMN capture_index INTEGER NOT NULL DEFAULT 1`,
+  ]) {
+    try {
+      await db.execute(alter);
+    } catch {
+      /* column already exists */
+    }
+  }
 }
 
 /** LWW upsert by id using updated_at */
@@ -120,8 +134,8 @@ export async function upsertSession(
     sql: `INSERT INTO processing_sessions (
       id, user_id, flock_id, flock_name, processed_at, birds_started,
       chick_cost, feed_lbs, feed_cost, supplies_cost, target_price_per_lb,
-      avg_live_weight, notes, status, created_at, updated_at, client_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      avg_live_weight, notes, status, current_capture_index, created_at, updated_at, client_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       flock_name=excluded.flock_name,
       processed_at=excluded.processed_at,
@@ -134,6 +148,7 @@ export async function upsertSession(
       avg_live_weight=excluded.avg_live_weight,
       notes=excluded.notes,
       status=excluded.status,
+      current_capture_index=excluded.current_capture_index,
       updated_at=excluded.updated_at
     WHERE excluded.updated_at >= processing_sessions.updated_at`,
     args: [
@@ -151,6 +166,7 @@ export async function upsertSession(
       s.avgLiveWeight,
       s.notes,
       s.status,
+      s.currentCaptureIndex ?? 1,
       s.createdAt,
       s.updatedAt,
       s.clientId,
@@ -161,11 +177,12 @@ export async function upsertSession(
 export async function upsertBird(db: Client, b: BirdRecord): Promise<void> {
   await db.execute({
     sql: `INSERT INTO bird_records (
-      id, session_id, sequence, dressed_weight_lb, live_weight_lb, condemned,
+      id, session_id, sequence, capture_index, dressed_weight_lb, live_weight_lb, condemned,
       notes, captured_at, created_at, updated_at, client_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       sequence=excluded.sequence,
+      capture_index=excluded.capture_index,
       dressed_weight_lb=excluded.dressed_weight_lb,
       live_weight_lb=excluded.live_weight_lb,
       condemned=excluded.condemned,
@@ -177,6 +194,7 @@ export async function upsertBird(db: Client, b: BirdRecord): Promise<void> {
       b.id,
       b.sessionId,
       b.sequence,
+      b.captureIndex ?? 1,
       b.dressedWeightLb,
       b.liveWeightLb,
       b.condemned ? 1 : 0,
