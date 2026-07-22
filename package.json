@@ -1,6 +1,8 @@
 {
   "name": "flock",
   "version": "0.1.0",
+  "license": "MIT",
+  "author": "Daniel Crawford",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",

@@ -71,3 +71,13 @@ Pure functions in `src/lib/metrics/calculate.ts`. Verified against the PRD worke
 ## Out of scope (Phase 2+)
 
 Multi-user roles, feed grow-out timeline, OCR, shared cost ledger, layer/egg tracking, labels, Cloudflare R2 PDF storage.
+
+## Contributing
+
+Contributions, bug reports, and ideas are welcome — please open an issue or a
+pull request. If you're planning a larger change, open an issue first so we can
+discuss the approach.
+
+## License
+
+Released under the [MIT License](LICENSE). © 2026 Daniel Crawford.
